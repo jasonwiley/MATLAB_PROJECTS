@@ -209,8 +209,8 @@ disp(positions);
 figure()
 heatmap(hplot,'colormap',hot)
 %hot,jet,pink
-xlim([min(rowIndices) max(rowIndices)])
-ylim([min(colIndices) max(colIndices)])
+xlim([2560 2593])
+ylim([2550 2583])
 title(sprintf('N18N9NG%d Middle Lamellae',number_of_grafts))
 xlabel('y')
 ylabel('z')
