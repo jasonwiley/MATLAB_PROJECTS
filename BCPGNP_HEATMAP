@@ -1,4 +1,4 @@
-@version 1.1 overlay heatmap of polymer beads grafted to nanoparticle
+%@version 1.2 overlay heatmap of polymer beads grafted to nanoparticle
 clear all
 close all
 tic;
@@ -44,6 +44,7 @@ for i = 1:size(c_bead_index,3)
     end
 end
 b_beads_per_nanoparticle = system1.all_pos(system1.middle_b_index,:);
+b_bead_pos_per_nanoparticle = zeros(size(c_bead_index,1)*size(c_bead_index,2),3,size(c_bead_index,3))
 for i = 1:size(c_bead_index,3)
     m=1;
      for j = 1:size(c_bead_index,2)
@@ -62,6 +63,7 @@ xlim([-20 20])
 ylim([-20 20])
 zlim([-20 20])
 a_bead_index = find(system1.all_attype == 'A');
+index = zeros(1,size(system1.middle_a_index,1));
 for i = 1:size(a_bead_index,1)
     for j = 1:size(system1.middle_a_index,1)
         if a_bead_index(i) == system1.middle_a_index(j)
@@ -70,12 +72,18 @@ for i = 1:size(a_bead_index,1)
         end
     end
 end
+selected_c_in_middle_lamellae = zeros(size(c_bead_pos_per_nanoparticle,1),size(c_bead_pos_per_nanoparticle,2),size(index,2))
 for i = 1:size(index,2)
     selected_c_in_middle_lamellae(:,:,i) = c_bead_pos_per_nanoparticle(:,:,index(i));
 end
+a_bead_middle_lamellae_positions = zeros(size(system1.middle_a_index,1),3);
 for i = 1:size(system1.middle_a_index,1)
     a_bead_middle_lamellae_positions(i,1:3) = system1.all_pos(system1.middle_a_index(i),:); 
 end
+centered_a_positions = zeros(size(system1.middle_a_index,1),3);
+centered_c_positions = zeros(size(selected_c_in_middle_lamellae,1),3,size(system1.middle_a_index,1));
+raw_c_positions = zeros(size(selected_c_in_middle_lamellae,1),3,size(system1.middle_a_index,1));
+c_bead_adjustment = zeros(size(selected_c_in_middle_lamellae,1),3,size(system1.middle_a_index,1));
 for i = 1:size(system1.middle_a_index,1)
     centered_a_positions(i,:) = a_bead_middle_lamellae_positions(i,:) - a_bead_middle_lamellae_positions(i,:);
     for j = 1:size(selected_c_in_middle_lamellae,1)
@@ -85,12 +93,15 @@ for i = 1:size(system1.middle_a_index,1)
     end
 end
 b_bead_index = c_bead_index(1,:,:);
+b_bead_positions = zeros(size(b_bead_index,2),3,size(index,2));
 for i = 1:size(index,2)
     for j = 1:size(b_bead_index,2)
         b_bead_positions(j,1:3,i) = system1.all_pos(b_bead_index(1,j,index(i)),:);
     end
 end
-
+centered_b_positions = zeros(size(b_bead_positions,1),3,size(b_bead_positions,3));
+raw_b_positions = zeros(size(b_bead_positions,1),3,size(b_bead_positions,3));
+b_bead_adjustment =zeros(size(b_bead_positions,1),3,size(b_bead_positions,3));
 for i = 1:size(b_bead_positions,1)%100
     for j = 1:size(b_bead_positions,3)%55
         centered_b_positions (i,:,j)= b_bead_positions(i,:,j) - a_bead_middle_lamellae_positions(j,:);
@@ -98,9 +109,8 @@ for i = 1:size(b_bead_positions,1)%100
         b_bead_adjustment(i,:,j) = -a_bead_middle_lamellae_positions(j,:);
     end
 end
-
-%Code works perfectly until here now need to calculate angles
-adjacent=([0 2 0]);
+centered_graft_angles = zeros(size(centered_b_positions,1),size(centered_b_positions,3));
+raw_graft_angles = zeros(size(centered_b_positions,1),size(centered_b_positions,3));
 for i = 1:size(centered_b_positions,3)
     for j = 1:size(centered_b_positions,1)
         centered_graft_angles(j,i) = atan2(centered_b_positions(j, 3, i), centered_b_positions(j, 2, i));
@@ -109,6 +119,8 @@ for i = 1:size(centered_b_positions,3)
 end
 centered_graft_angles = rad2deg(centered_graft_angles);
 raw_graft_angles = rad2deg(raw_graft_angles);
+centered_combined_angle_pos = zeros(size(centered_graft_angles,1),4,size(centered_graft_angles,2));
+raw_combined_angle_pos = zeros(size(centered_graft_angles,1),4,size(centered_graft_angles,2));
 for i = 1:size(centered_graft_angles,2)
     for j = 1:size(centered_graft_angles,1)
         centered_combined_angle_pos(j,:,i) = [centered_graft_angles(j,i) centered_b_positions(j,:,i)];
@@ -174,53 +186,20 @@ for i = 1:size(selected_c_bead_index,2)
         selected_c_positions(j,1:3,i) = system1.all_pos(selected_c_bead_index(j,i),1:3);
     end
 end
-
-
-
-%  combined_angle_indices = [combined_angle_indices combined_angle_indices + number_of_c-1];
-% selected_c_beads = zeros(900,3,55);
-% % for i = 1:size(combined_angle_indices,3)
-% %     k=1;
-% %     for j = 1:size(combined_angle_indices,1)
-% %         selected_c_beads(k:k+number_of_c-1,1:3,i) = c_bead_pos_lamellae(combined_angle_indices(j,1,i):combined_angle_indices(j,2,i),:,i);
-% %         k=k+9;
-% %     end
-% % end
 c_bead_pos_lamellae=centered_matrix_for_heatmap(:,2:end);
-%  for j = 1:size(b_bead_pos_per_nanoparticle,3)
-%         for i = 1:(size(b_bead_pos_per_nanoparticle,1)-1)
-%             rotation_angle(i,j) = rad2deg(acos(dot(b_bead_pos_per_nanoparticle(i,1:3,j), b_bead_pos_per_nanoparticle(i+1,1:3,j))/(norm(b_bead_pos_per_nanoparticle(i,1:3,j))*norm(b_bead_pos_per_nanoparticle(i+1,1:3,j)))));
-%         end
-% end
-% mean_angle=mean((mean(rotation_angle)));
-% total_angle = 0;
-% old_angle = 0;
-% k = 1;
-% while total_angle < 180
-    resolution = 10;
-    center = 2000;
-    rounded_c_bead_pos = round(c_bead_pos_lamellae * resolution);
-    rounded_c_bead_pos = rounded_c_bead_pos + abs(min(min(rounded_c_bead_pos)));
-%     rounded_c_bead_pos = round(rounded_c_bead_pos * rotx(mean_angle));
-    % c_bead_pos_lamellae=round(c_bead_pos_lamellae);
-    gridsize=round(3150);
-    grid=zeros(gridsize,gridsize);
-    % center=[round(gridsize*0.5), round(gridsize*0.5), round(gridsize*0.5)];
-    temp2grid=zeros(gridsize,gridsize);
-    temp1grid=zeros(gridsize,gridsize);
-   
-
-     % Update rotation
-%     old_angle = old_angle + mean_angle; 
-    for i = 1:size(rounded_c_bead_pos, 1) 
-        y_coord = rounded_c_bead_pos(i, 2) + center; 
-        z_coord = rounded_c_bead_pos(i, 3) + center; 
-        temp1grid(z_coord, y_coord) = temp1grid(z_coord, y_coord) + 1;
-    end
-%     total_angle = old_angle; 
-%     k = k + 1;
-% end
-% end
+resolution = 10;
+center = 2000;
+rounded_c_bead_pos = round(c_bead_pos_lamellae * resolution);
+rounded_c_bead_pos = rounded_c_bead_pos + abs(min(min(rounded_c_bead_pos)));
+gridsize=round(3150);
+grid=zeros(gridsize,gridsize);
+temp2grid=zeros(gridsize,gridsize);
+temp1grid=zeros(gridsize,gridsize);
+for i = 1:size(rounded_c_bead_pos, 1) 
+    y_coord = rounded_c_bead_pos(i, 2) + center; 
+    z_coord = rounded_c_bead_pos(i, 3) + center; 
+    temp1grid(z_coord, y_coord) = temp1grid(z_coord, y_coord) + 1;
+end
 hplot=sum(temp1grid,3);
 hplot = temp1grid;
 nonZeroIndices = find(hplot ~= 0);
@@ -235,7 +214,6 @@ ylim([min(colIndices) max(colIndices)])
 title(sprintf('N18N9NG%d Middle Lamellae',number_of_grafts))
 xlabel('y')
 ylabel('z')
-
 toc;
 run_time = toc;
 disp(['Total Run Time = ' num2str(run_time) ' Seconds'])
