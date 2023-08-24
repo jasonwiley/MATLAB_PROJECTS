@@ -1,0 +1,204 @@
+%@version 1.3 overlay heatmap of polymer beads grafted to nanoparticle
+clear all
+close all
+%start timing
+tic;
+%set system descriptors for nanoparticles
+number_of_grafts=100;
+number_of_graft_sites = 104;
+number_of_nanoparticles=110;
+number_of_c = 9;
+number_of_d = 9;
+%set angles from which to select.  0 is in the positive y direction, 180 is
+% in the negative y direction
+upper_low_angle = 45;
+upper_hi_angle = 135;
+lower_low_angle = 225;
+lower_hi_angle = 315;
+%load files and change system variables
+load(sprintf('N18N9NG%d_ROTATED_FULL_C_SYSTEM.mat',number_of_grafts));
+load(sprintf('N18NA9NG%d_CHAINSTATS_NO_D.mat',number_of_grafts));
+evalin('base', 'chainstatsystem = ans;');
+evalin('base', 'clear ans;');
+%remove any chains which are all 0
+columns_with_zeros = any(chainstatsystem.chains2 == 0, 1);
+chainstatsystem.chains2(:,columns_with_zeros) = [];
+%grab_indexes for all bead types
+a_bead_index = find(system1.all_attype == 'A');
+b_bead_index = system1.all_pos(system1.middle_b_index);
+c_bead_index = reshape(chainstatsystem.chains2,number_of_c+1,number_of_grafts,number_of_nanoparticles);
+%find c bead positions for each nanoparticle
+c_bead_pos_per_nanoparticle = zeros(number_of_c*number_of_grafts,3,number_of_nanoparticles);
+for i = 1:size(c_bead_index,3)
+    m=1;
+     for j = 1:size(c_bead_index,2)
+           for k = 1:size(c_bead_index,1)
+               c_bead_pos_per_nanoparticle(m,1:3,i) = system1.all_pos(c_bead_index(k,j,i),:);
+               m=m+1;
+           end
+    end
+end
+%find the a beads indexes which are in the middle lamellae
+index = zeros(1,size(system1.middle_a_index,1));
+for i = 1:size(a_bead_index,1)
+    for j = 1:size(system1.middle_a_index,1)
+        if a_bead_index(i) == system1.middle_a_index(j)
+            index(j) = i;
+        else
+        end
+    end
+end
+%grab the a bead positions in the middle lamellae
+a_bead_middle_lamellae_positions = zeros(size(system1.middle_a_index,1),3);
+for i = 1:size(system1.middle_a_index,1)
+    a_bead_middle_lamellae_positions(i,1:3) = system1.all_pos(system1.middle_a_index(i),:); 
+end
+%grab the b bead indexes and positions
+b_bead_index = c_bead_index(1,:,:);
+b_bead_positions = zeros(size(b_bead_index,2),3,size(index,2));
+for i = 1:size(index,2)
+    for j = 1:size(b_bead_index,2)
+        b_bead_positions(j,1:3,i) = system1.all_pos(b_bead_index(1,j,index(i)),:);
+    end
+end
+%calculate the uncentered b positions
+raw_b_positions = zeros(size(b_bead_positions,1),3,size(b_bead_positions,3));
+for i = 1:size(b_bead_positions,1)%100
+    for j = 1:size(b_bead_positions,3)%55
+        raw_b_positions(i,:,j) = b_bead_positions(i,:,j);
+    end
+end
+%calculate angle between each a bead and b bead with 0 being in the
+%positive y direction
+raw_graft_angles = zeros(size(raw_b_positions,1),size(raw_b_positions,3));
+for i = 1:size(raw_b_positions,3)
+    for j = 1:size(raw_b_positions,1)
+        raw_graft_angles(j,i) = mod(atan2((b_bead_positions(j, 3, i) - a_bead_middle_lamellae_positions(i,3)), (b_bead_positions(j, 2, i) - a_bead_middle_lamellae_positions(i,2))),2*pi);
+    end
+end
+%convert radians to degrees
+raw_graft_angles = rad2deg(raw_graft_angles);
+%create matrix where a - b graft angles are combined with their corresponding b
+%position
+raw_combined_angle_pos = zeros(size(raw_graft_angles,1),4,size(raw_graft_angles,2));
+for i = 1:size(raw_graft_angles,2)
+    for j = 1:size(raw_graft_angles,1)
+        raw_combined_angle_pos(j,:,i) = [raw_graft_angles(j,i) raw_b_positions(j,:,i)];
+    end
+end
+clear k
+%Select b positions according to angle made with a bead
+k = 1;
+for i = 1:size(raw_combined_angle_pos,3)
+    for j = 1:size(raw_combined_angle_pos,1)
+        if raw_combined_angle_pos(j,1,i) < upper_hi_angle & raw_combined_angle_pos(j,1,i) > upper_low_angle
+            raw_matrix_for_heatmap(k,1:4) = raw_combined_angle_pos(j,1:4,i);
+            k = k + 1;
+        elseif raw_combined_angle_pos(j,1,i) < lower_hi_angle & raw_combined_angle_pos(j,1,i) > lower_low_angle
+            raw_matrix_for_heatmap(k,1:4) = raw_combined_angle_pos(j,1:4,i);
+            k = k + 1;
+        else
+        end
+    end
+end
+%now we begin mapping b beads to a beads after angle selection.  here we
+%find all system positions that match the positions of the
+%raw_matrix_for_heatmap variable created in previous step
+final_selected_b_indexes = [];
+for i = 1:size(raw_matrix_for_heatmap, 1)
+    for j = 1:size(system1.all_pos, 1)
+        if all(system1.all_pos(j, 1:3) == raw_matrix_for_heatmap(i, 2:4))
+            final_selected_b_indexes(end+1) = j;
+        break
+        end
+    end
+end
+%now we map those indices to a beads by checking to see what a_bead_index
+%range they fall into.  this tells us which b beads belong to which a beads
+true_a_bead_index = []; 
+for j = 1:size(final_selected_b_indexes,2)
+    for i = 1:size(a_bead_index,1)
+        if final_selected_b_indexes(:,j) < a_bead_index(i,:)
+            true_a_bead_index(end+1) = a_bead_index(i-1);
+            break; 
+        end
+    end
+end
+%remove zeros from the above matrix 'true_a_bead_index'
+columns_with_zeros = any(true_a_bead_index == 0, 1);
+true_a_bead_index(:,columns_with_zeros) = [];
+%the first row of chainstatsystem.chains2 contains b bead indexes.  we
+%search those indices for indices that also belong to
+%'final_selected_b_indexes' then store the corresponding c beads that are
+%stored in the other rows.  this maps our c beads to b beads.
+selected_c_bead_index = [];
+for i = 1:size(chainstatsystem.chains2,2)%11000
+    for k = 1:size(final_selected_b_indexes,2)%2774
+        if chainstatsystem.chains2(1,i) == final_selected_b_indexes(1,k)
+            for j = 1:number_of_c%9
+            selected_c_bead_index(j,i) = chainstatsystem.chains2(j+1,i);
+            end
+        else
+        end
+    end
+end
+%remove zero values from 'selected_c_bead_index'
+columns_with_zeros = any(selected_c_bead_index == 0, 1);
+selected_c_bead_index(:,columns_with_zeros) = [];
+%now that we have the c indices, find the positions
+for i = 1:size(selected_c_bead_index,2)
+    for j = 1:size(selected_c_bead_index,1)
+            selected_c_positions(j,1:3,i) = system1.all_pos(selected_c_bead_index(j,i),1:3);
+    end
+end
+%now that we have the a mapped to b and b mapped to c, we can now center
+%the c positions around (0,0,0) to create the heatmap 
+for i = 1:size(selected_c_positions,3)
+    for j = 1:number_of_c
+        centered_selected_c_beads(j,:,i) = selected_c_positions(j,:,i) - system1.all_pos(true_a_bead_index(1,i),:);
+    end
+end
+%since 'centered_selected_c_beads' is 3D we need to make 2D and join the
+%pages from end to end.
+[num_rows, num_cols, num_pages] = size(centered_selected_c_beads);
+concatenated_centered_c_beads = [];
+for page = 1:num_pages
+    page_data = centered_selected_c_beads(:,:,page);
+    concatenated_centered_c_beads = [concatenated_centered_c_beads; page_data];
+end
+%c_bead_pos_lamellae was part of previous code, so we change variables
+%here to streamline coding.
+c_bead_pos_lamellae = concatenated_centered_c_beads;
+%resolution multiplies the variables by a factor of your choosing so that 
+%you can make the final heatmap more fine or coarse. higher numbers tend to
+%make more fine detail.
+resolution = 10;
+%center is a variable added to move the values of the coordinates to avoid
+%negative indexing.  indices must be positive.
+center = 2000;
+%this rounds the values in c_bead_pos_lamellae * resolution so that they
+%are intergers.  indices must be intergers.
+rounded_c_bead_pos = round(c_bead_pos_lamellae * resolution);
+rounded_c_bead_pos = rounded_c_bead_pos + abs(min(min(rounded_c_bead_pos)));
+%gridsize initializes the grid of the heatmap which is stored in temp1grid
+gridsize=round(3150);
+temp1grid=zeros(gridsize,gridsize);
+%loop through rounded_c_bead_pos using y and z coordinates.  if a value is
+%found at (y,z) a value of +1 is added to that grid space.  
+for i = 1:size(rounded_c_bead_pos, 1) 
+    y_coord = rounded_c_bead_pos(i, 2) + center; 
+    z_coord = rounded_c_bead_pos(i, 3) + center; 
+    temp1grid(z_coord, y_coord) = temp1grid(z_coord, y_coord) + 1;
+end
+%now plot the results
+figure()
+heatmap(temp1grid,'colormap',hot)
+%hot,jet,pink
+xlim([2520 2610])
+ylim([2520 2610])
+title(sprintf('N18N9NG%d Middle Lamellae',number_of_grafts))
+xlabel('y')
+ylabel('z')
+toc;
+run_time = toc;
+disp(['Total Run Time = ' num2str(run_time / 60) ' Minutes'])
